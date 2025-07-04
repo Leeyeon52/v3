@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/base_screen.dart'; // BaseScreen 임포트
 import '../../../core/result.dart'; // Result 클래스 임포트
 import '../viewmodel/auth_viewmodel.dart'; // AuthViewModel 임포트
+import '../model/user.dart'; // User 모델 임포트
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,23 +31,31 @@ class _LoginScreenState extends BaseScreen<LoginScreen> { // BaseScreen 상속
     final email = _emailController.text;
     final password = _passwordController.text;
 
-    final result = await authViewModel.login(email, password, context); // context 전달
+    final result = await authViewModel.login(email, password);
 
     showLoading(false); // 로딩 종료
 
-    if (result is Success) {
-      context.go('/home'); // 로그인 성공 시 홈 화면으로 이동
-    } else if (result is Failure) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message)),
-      );
+    if (result is Success<User>) { // Result<User> 타입 확인
+      if (context.mounted) {
+        context.go('/home'); // 로그인 성공 시 홈 화면으로 이동
+        showSnackBar('로그인 성공!'); // BaseScreen의 showSnackBar 사용
+      }
+    } else if (result is Failure<User>) { // Result<User> 타입 확인
+      if (context.mounted) {
+        showSnackBar('로그인 실패: ${result.message}'); // BaseScreen의 showSnackBar 사용
+      }
     }
   }
 
   @override
   Widget buildBody(BuildContext context) { // buildBody 구현
     return Scaffold(
-      appBar: AppBar(title: const Text('로그인')),
+      appBar: AppBar(
+        title: const Text('로그인'),
+        centerTitle: true,
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -73,21 +82,17 @@ class _LoginScreenState extends BaseScreen<LoginScreen> { // BaseScreen 상속
             ElevatedButton(
               onPressed: _login,
               style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50), // 버튼 가로 확장
+                minimumSize: const Size(double.infinity, 50), // 버튼 너비를 최대로
               ),
               child: const Text('로그인'),
             ),
             TextButton(
-              onPressed: () {
-                context.go('/register'); // 회원가입 화면으로 이동
-              },
+              onPressed: () => context.go('/register'),
               child: const Text('회원가입'),
             ),
             TextButton(
-              onPressed: () {
-                context.go('/find-account'); // 계정 찾기 화면으로 이동
-              },
-              child: const Text('계정 찾기'),
+              onPressed: () => context.go('/find-account'),
+              child: const Text('아이디/비밀번호 찾기'),
             ),
           ],
         ),

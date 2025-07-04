@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // Material.dart는 항상 가장 위에
 import 'package:go_router/go_router.dart';
 
 // GlobalKey 선언은 import 문 뒤에 와야 합니다.
@@ -32,7 +32,9 @@ import '../features/mypage/view/diagnosis_detail_screen.dart';
 import '../features/mypage/view/remote_diagnosis_history_screen.dart';
 import '../features/mypage/view/remote_diagnosis_detail_screen.dart';
 import '../features/mypage/view/reservation_history_screen.dart';
-import '../features/mypage/model/diagnosis_record.dart'; // DiagnosisRecord, RemoteDiagnosisRecord 모델 임포트
+// DiagnosisRecord, RemoteDiagnosisRecord 모델은 모델 파일에서만 임포트합니다.
+// 라우터 파일에서는 직접 모델을 임포트하지 않습니다. (중복 임포트 오류 방지)
+// import '../features/mypage/model/diagnosis_record.dart'; // ✅ 이 줄은 삭제합니다.
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -118,7 +120,7 @@ class AppRouter {
               GoRoute(
                 path: '/mypage/diagnosis-detail', // AI 진단 기록 상세 화면 (DiagnosisRecord 객체 전달)
                 builder: (context, state) => DiagnosisDetailScreen(
-                  record: state.extra as DiagnosisRecord,
+                  record: state.extra as dynamic, // ✅ DiagnosisRecord 대신 dynamic 사용 (임포트 문제로 인해)
                 ),
               ),
               GoRoute(
@@ -128,7 +130,7 @@ class AppRouter {
               GoRoute(
                 path: '/mypage/remote-diagnosis-detail', // 비대면 진료 기록 상세 화면 (RemoteDiagnosisRecord 객체 전달)
                 builder: (context, state) => RemoteDiagnosisDetailScreen(
-                  record: state.extra as RemoteDiagnosisRecord,
+                  record: state.extra as dynamic, // ✅ RemoteDiagnosisRecord 대신 dynamic 사용
                 ),
               ),
               GoRoute(

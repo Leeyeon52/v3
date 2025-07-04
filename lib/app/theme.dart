@@ -99,7 +99,7 @@ class AppTheme {
       errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 12),
     ),
 
-    cardTheme: const CardTheme( // ✅ CardTheme으로 다시 변경 (최신 Flutter 버전에서 CardThemeData 대신 CardTheme 사용)
+    cardTheme: const CardThemeData( // ✅ CardThemeData로 다시 변경 (오류 메시지에 따라)
       color: Colors.white,
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -114,7 +114,7 @@ class AppTheme {
       foregroundColor: Colors.white,
     ),
 
-    tabBarTheme: const TabBarTheme( // ✅ TabBarTheme으로 다시 변경
+    tabBarTheme: const TabBarThemeData( // ✅ TabBarThemeData로 다시 변경 (오류 메시지에 따라)
       labelColor: Color(0xFF535D5C), // 선택된 탭 텍스트 색상
       unselectedLabelColor: Colors.grey, // 선택되지 않은 탭 텍스트 색상
       indicatorSize: TabBarIndicatorSize.tab,
