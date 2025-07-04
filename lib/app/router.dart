@@ -1,28 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+// GlobalKey 선언은 import 문 뒤에 와야 합니다.
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>();
+
+// Auth (인증) 관련 화면
 import '../features/auth/view/login_screen.dart';
 import '../features/auth/view/register_screen.dart';
-import '../features/home/view/main_scaffold.dart'; // MainScaffold 임포트
-import '../features/home/view/home_screen.dart'; // HomeScreen 임포트 (MainScaffold의 자식으로 사용)
-import '../features/chatbot/view/chatbot_screen.dart';
-import '../features/mypage/view/mypage_screen.dart';
+import '../features/auth/view/find_account_screen.dart';
+
+// Home (메인) 화면 및 ShellRoute의 메인 스캐폴드
+import '../features/home/view/main_scaffold.dart';
+import '../features/home/view/home_screen.dart';
+
+// Chatbot (챗봇) 관련 파일
+import '../features/chatbot/view/chat_screen.dart';
+
+// Diagnosis (진단) 관련 화면
 import '../features/diagnosis/view/upload_screen.dart';
 import '../features/diagnosis/view/result_screen.dart';
-import '../features/history/view/history_screen.dart';
 import '../features/diagnosis/view/realtime_prediction_screen.dart';
+
+// MyPage (마이페이지) 관련 화면 및 모델
+import '../features/mypage/view/mypage_screen.dart';
 import '../features/mypage/view/edit_profile_screen.dart';
-import '../features/auth/view/find-Account_screen.dart'; // FindAccountScreen 임포트 추가
+import '../features/mypage/view/change_password_screen.dart';
+import '../features/mypage/view/chat_history_screen.dart';
+import '../features/mypage/view/diagnosis_history_screen.dart';
+import '../features/mypage/view/diagnosis_detail_screen.dart';
+import '../features/mypage/view/remote_diagnosis_history_screen.dart';
+import '../features/mypage/view/remote_diagnosis_detail_screen.dart';
+import '../features/mypage/view/reservation_history_screen.dart';
+import '../features/mypage/model/diagnosis_record.dart'; // DiagnosisRecord, RemoteDiagnosisRecord 모델 임포트
 
 class AppRouter {
-  static final _rootNavigatorKey = GlobalKey<NavigatorState>();
-  static final _shellNavigatorKey = GlobalKey<NavigatorState>(); // ShellRoute를 위한 별도의 NavigatorKey
-
-  static final router = GoRouter(
+  static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey, // 최상위 NavigatorKey
     initialLocation: '/login', // 앱 시작 시 초기 경로
     routes: [
-      // 로그인 및 회원가입 화면 (하단 탭 바 없음)
+      // 1. 인증 및 계정 찾기 화면 (하단 탭 바 없음)
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
@@ -31,62 +48,102 @@ class AppRouter {
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
       ),
-      // ✅ 추가된 부분: FindAccountScreen에 대한 GoRoute 정의
       GoRoute(
-        path: '/find-account', // 이 경로로 FindAccountScreen에 접근할 수 있습니다.
+        path: '/find-account', // FindAccountScreen에 대한 GoRoute 정의
         builder: (context, state) => const FindAccountScreen(),
       ),
 
-      // ✅ ShellRoute: 하단 탭 바가 있는 화면들을 감싸는 역할
-      ShellRoute(
-        navigatorKey: _shellNavigatorKey, // ShellRoute는 자체 NavigatorKey를 가집니다.
-        builder: (context, state, child) {
+      // 2. ShellRoute: 하단 탭 바가 있는 화면들을 감싸는 역할
+      // 이 라우트 내부에 있는 화면들은 MainScaffold의 BottomNavigationBar를 공유합니다.
+      StatefulShellRoute.indexedStack( // ✅ StatefulShellRoute로 변경
+        builder: (context, state, navigationShell) { // ✅ navigationShell 파라미터 추가
           // MainScaffold가 하단 탭 바를 제공하고, child는 현재 선택된 탭의 화면입니다.
-          // ✅ state.fullPath 대신 state.uri.toString() 사용
-          return MainScaffold(child: child, currentLocation: state.uri.toString());
+          return MainScaffold(navigationShell: navigationShell); // ✅ navigationShell 전달
         },
-        routes: [
-          // MainScaffold 내부에 표시될 탭 화면들
-          GoRoute(
-            path: '/home', // 홈 탭
-            builder: (context, state) => const HomeScreen(),
-          ),
-          GoRoute(
-            path: '/chatbot', // 챗봇 탭
-            builder: (context, state) => const ChatbotScreen(),
-          ),
-          GoRoute(
-            path: '/mypage', // 마이페이지 탭
-            builder: (context, state) => const MyPageScreen(),
-            routes: [
-              // 개인정보 수정 화면은 마이페이지 탭의 하위 라우트로 중첩
+        branches: [
+          StatefulShellBranch(
+            routes: <GoRoute>[
               GoRoute(
-                path: 'edit', // '/mypage/edit' 경로가 됨
-                builder: (context, state) => const EditProfileScreen(),
+                path: '/home', // 홈 탭
+                builder: (context, state) => const HomeScreen(),
               ),
             ],
           ),
-          GoRoute(
-            path: '/history', // 진단 기록 화면 (탭에서 접근 가능)
-            builder: (context, state) => const HistoryScreen(),
+          StatefulShellBranch(
+            routes: <GoRoute>[
+              GoRoute(
+                path: '/chatbot', // 챗봇 탭
+                builder: (context, state) => const ChatScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/upload', // 사진 진단 업로드 화면 (탭에서 접근 가능)
-            builder: (context, state) => const UploadScreen(),
+          StatefulShellBranch(
+            routes: <GoRoute>[
+              GoRoute(
+                path: '/diagnosis/upload', // 사진 진단 업로드 화면
+                builder: (context, state) => const UploadScreen(),
+              ),
+              GoRoute(
+                path: '/diagnosis/result', // 진단 결과 화면
+                builder: (context, state) => const ResultScreen(),
+              ),
+              GoRoute(
+                path: '/diagnosis/realtime', // 실시간 예측 화면
+                builder: (context, state) => const RealtimePredictionScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: '/result', // 진단 결과 화면 (탭에서 접근 가능)
-            builder: (context, state) => const ResultScreen(),
+          StatefulShellBranch(
+            routes: <GoRoute>[
+              GoRoute(
+                path: '/mypage', // 마이페이지 탭
+                builder: (context, state) => const MyPageScreen(),
+              ),
+              GoRoute(
+                path: '/mypage/edit', // '/mypage/edit' 경로가 됨
+                builder: (context, state) => const EditProfileScreen(),
+              ),
+              GoRoute(
+                path: '/mypage/change-password', // 비밀번호 변경 화면
+                builder: (context, state) => const ChangePasswordScreen(),
+              ),
+              GoRoute(
+                path: '/mypage/chat-history', // 챗봇 대화 기록 화면
+                builder: (context, state) => const ChatHistoryScreen(),
+              ),
+              GoRoute(
+                path: '/mypage/diagnosis-history', // AI 진단 기록 화면
+                builder: (context, state) => const DiagnosisHistoryScreen(),
+              ),
+              GoRoute(
+                path: '/mypage/diagnosis-detail', // AI 진단 기록 상세 화면 (DiagnosisRecord 객체 전달)
+                builder: (context, state) => DiagnosisDetailScreen(
+                  record: state.extra as DiagnosisRecord,
+                ),
+              ),
+              GoRoute(
+                path: '/mypage/remote-diagnosis-history', // 비대면 진료 기록 화면
+                builder: (context, state) => const RemoteDiagnosisHistoryScreen(),
+              ),
+              GoRoute(
+                path: '/mypage/remote-diagnosis-detail', // 비대면 진료 기록 상세 화면 (RemoteDiagnosisRecord 객체 전달)
+                builder: (context, state) => RemoteDiagnosisDetailScreen(
+                  record: state.extra as RemoteDiagnosisRecord,
+                ),
+              ),
+              GoRoute(
+                path: '/mypage/reservation-history', // 병원 예약 내역 화면
+                builder: (context, state) => const ReservationHistoryScreen(),
+              ),
+            ],
           ),
         ],
       ),
-
-      // ShellRoute 외부에 있는 화면 (하단 탭 바 없음)
-      // 예: 실시간 예측 화면 (전체 화면으로 표시)
-      GoRoute(
-        path: '/diagnosis/realtime',
-        builder: (context, state) => const RealtimePredictionScreen(),
-      ),
     ],
+    // 에러 처리 (선택 사항)
+    errorBuilder: (context, state) => Scaffold(
+      appBar: AppBar(title: const Text('오류 발생')),
+      body: Center(child: Text('페이지를 찾을 수 없습니다: ${state.error}')),
+    ),
   );
 }

@@ -1,107 +1,81 @@
-// C:\Users\sptzk\Desktop\t0703\lib\features\auth\viewmodel\auth_viewmodel.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/result.dart'; // Result 클래스 임포트
+import '../model/user.dart'; // User 모델 임포트
+import '../../../core/strategy/auth_strategy.dart'; // AuthStrategy 임포트
+import '../../../core/strategy/api_auth_strategy.dart'; // ApiAuthStrategy 임포트
 
-import 'dart:convert';
-import 'package:flutter/foundation.dart'; // kIsWeb을 위해 필요
-import 'package:http/http.dart' as http;
-import '../model/user.dart';
+// ✅ MyPageViewModel 임포트 (로그인 성공 시 MyPageViewModel의 loadUser를 호출하기 위함)
+import '../../mypage/viewmodel/mypage_viewmodel.dart';
 
-class AuthViewModel with ChangeNotifier {
-  // ✅ 생성자를 통해 주입받도록 변경 (final 키워드 유지)
-  final String _baseUrl; 
+class AuthViewModel extends ChangeNotifier {
+  final AuthStrategy _authStrategy;
+  User? _currentUser; // 현재 로그인된 사용자 정보
 
-  // ✅ 생성자 추가: baseUrl을 필수 매개변수로 받습니다.
-  AuthViewModel({required String baseUrl}) : _baseUrl = baseUrl;
+  User? get currentUser => _currentUser;
 
-  Future<bool?> checkUserIdDuplicate(String userId) async {
-    try {
-      final res = await http.get(Uri.parse('$_baseUrl/auth/exists?user_id=$userId'));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        return data['exists'] == true;
-      } else {
-        if (kDebugMode) {
-          print('ID 중복검사 서버 응답 오류: StatusCode=${res.statusCode}, Body=${res.body}');
-        }
-        return null;
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('ID 중복검사 중 네트워크 오류: $e');
-      }
-      return null;
+  AuthViewModel({String? baseUrl}) : _authStrategy = ApiAuthStrategy(baseUrl: baseUrl);
+
+  // 로그인 메서드
+  Future<Result<User>> login(String email, String password, BuildContext context) async {
+    final success = await _authStrategy.login(email, password);
+    if (success) {
+      // 로그인 성공 시 더미 유저 정보 설정 (실제 앱에서는 서버에서 유저 정보를 받아와야 함)
+      _currentUser = User(email: email, name: "테스트유저", phone: "010-1234-5678");
+
+      // SharedPreferences에 사용자 정보 저장
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('userEmail', email);
+      await prefs.setString('userName', _currentUser?.name ?? '');
+      await prefs.setString('userPhone', _currentUser?.phone ?? '');
+
+      // MyPageViewModel에 사용자 정보 로드 (ChangeNotifierProvider로 접근)
+      final mypageViewModel = Provider.of<MyPageViewModel>(context, listen: false);
+      mypageViewModel.loadUserInfo(); // MyPageViewModel의 정보 로드 메서드 호출
+
+      notifyListeners();
+      return Success(_currentUser!);
+    } else {
+      _currentUser = null;
+      notifyListeners();
+      return const Failure('로그인 실패');
     }
   }
 
-  Future<String?> registerUser(Map<String, String> userData) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(userData),
-      );
-
-      if (res.statusCode == 201) {
-        return null;
-      } else {
-        final data = jsonDecode(res.body);
-        return data['error'] ?? '알 수 없는 오류가 발생했습니다.';
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('회원가입 중 네트워크 오류: $e');
-      }
-      return '서버와 연결할 수 없습니다. 네트워크 상태를 확인해주세요.';
+  // 회원가입 메서드
+  Future<Result<bool>> register(String email, String password, String name) async {
+    final success = await _authStrategy.register(email, password, name);
+    if (success) {
+      return const Success(true);
+    } else {
+      return const Failure('회원가입 실패');
     }
   }
 
-  /// 사용자 로그인
-  /// 반환값: User 객체 (로그인 성공), String (오류 메시지)
-  Future<User?> loginUser(String userId, String password) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'user_id': userId, 'password': password}),
-      );
-
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        return User.fromJson(data['user']);
-      } else {
-        final data = jsonDecode(res.body);
-        throw data['error'] ?? '알 수 없는 로그인 오류';
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('로그인 중 네트워크 오류: $e');
-      }
-      if (e is String) {
-        throw e;
-      } else {
-        throw '서버와 연결할 수 없습니다. 네트워크 상태를 확인해주세요.';
-      }
-    }
+  // 로그아웃 메서드
+  Future<void> logout() async {
+    await _authStrategy.logout();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('userEmail');
+    await prefs.remove('userName');
+    await prefs.remove('userPhone');
+    _currentUser = null;
+    notifyListeners();
   }
 
-  Future<String?> deleteUser(String userId, String password) async {
-    try {
-      final res = await http.delete(
-        Uri.parse('$_baseUrl/auth/delete_account'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'user_id': userId, 'password': password}),
-      );
+  // 사용자 정보 로드 (앱 시작 시 등)
+  Future<void> loadUserFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('userEmail');
+    final name = prefs.getString('userName');
+    final phone = prefs.getString('userPhone');
 
-      if (res.statusCode == 200) {
-        return null;
-      } else {
-        final data = jsonDecode(res.body);
-        return data['error'] ?? '회원 탈퇴 중 알 수 없는 오류가 발생했습니다.';
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('회원 탈퇴 중 네트워크 오류: $e');
-      }
-      return '서버와 연결할 수 없습니다. 네트워크 상태를 확인해주세요.';
+    if (email != null) {
+      _currentUser = User(email: email, name: name, phone: phone);
+    } else {
+      _currentUser = null;
     }
+    notifyListeners();
   }
 }
